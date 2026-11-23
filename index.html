@@ -160,6 +160,40 @@ svg.map{display:block;width:100%;height:auto;background:#fff}
 @media(max-width:820px){.track img{width:300px}.depo .track img{width:220px}.track{animation-duration:45s}}
 @media(prefers-reduced-motion:reduce){.track{animation-duration:200s}}
 </style>
+<script>
+// ▼ RASTREAMENTO: cole aqui os seus IDs (deixe "" para desligar)
+window.TRACK = {
+  metaPixel: "",   // ID do Pixel da Meta, ex.: "123456789012345"
+  ga4:       "",   // ID do Google Analytics 4, ex.: "G-XXXXXXXXXX" (opcional)
+  tiktok:    ""    // ID do Pixel do TikTok (opcional)
+};
+(function(T){
+  if (T.metaPixel) {
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', T.metaPixel); fbq('track', 'PageView');
+  }
+  if (T.ga4) {
+    var g=document.createElement('script');g.async=1;g.src='https://www.googletagmanager.com/gtag/js?id='+T.ga4;document.head.appendChild(g);
+    window.dataLayer=window.dataLayer||[];window.gtag=function(){dataLayer.push(arguments)};gtag('js',new Date());gtag('config',T.ga4);
+  }
+  if (T.tiktok) {
+    !function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"];ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.load=function(e){var n="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{};ttq._i[e]=[];ttq._i[e]._u=n;var o=d.createElement("script");o.type="text/javascript";o.async=!0;o.src=n+"?sdkid="+e+"&lib="+t;var a=d.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};ttq.load(T.tiktok);ttq.page()}(window,document,"ttq");
+  }
+  // guarda os UTMs da primeira visita (para não se perderem)
+  try {
+    var q = location.search.slice(1);
+    if (/utm_|fbclid|ttclid|gclid/.test(q)) sessionStorage.setItem("mm_qs", q);
+  } catch(e) {}
+})(window.TRACK);
+// envia o mesmo evento para todas as ferramentas ligadas
+window.track = function(ev, data){
+  data = data || {};
+  var map = {ViewContent:["view_item","ViewContent"], InitiateCheckout:["begin_checkout","InitiateCheckout"]};
+  try { if (window.fbq) (map[ev] ? fbq('track', ev, data) : fbq('trackCustom', ev, data)); } catch(e) {}
+  try { if (window.gtag) gtag('event', map[ev] ? map[ev][0] : ev, {currency:data.currency, value:data.value, items:[{item_name:data.content_name}]}); } catch(e) {}
+  try { if (window.ttq) ttq.track(map[ev] ? map[ev][1] : ev, {currency:data.currency, value:data.value, content_name:data.content_name}); } catch(e) {}
+};
+</script>
 </head>
 <body>
 <div class="topbar">🎁 Oferta de lançamento: Kit Completo com 2 bônus por R$ 27,90</div>
@@ -395,7 +429,9 @@ completo:  "https://mentora.ao/produto/f58de199-9f01-440c-86f7-cf72e3338e71",   
 essencial: "https://mentora.ao/produto/f58de199-9f01-440c-86f7-cf72e3338e71",  // TEMPORÁRIO: mesmo link do Completo   // Kit Essencial, R$ 17,90
 downsell:  "https://mentora.ao/produto/f58de199-9f01-440c-86f7-cf72e3338e71"   // TEMPORÁRIO: mesmo link do Completo    // Kit Completo com desconto, R$ 22,90
 };
-const qs = location.search.slice(1);
+let qs = location.search.slice(1);
+try { if (!/utm_|fbclid/.test(qs)) qs = sessionStorage.getItem("mm_qs") || qs; } catch(e) {}
+const PRECO = {completo:{v:27.90,n:"Kit Completo"}, essencial:{v:17.90,n:"Kit Essencial"}, downsell:{v:22.90,n:"Kit Completo (oferta)"}};
 // Enquanto o Kit Essencial não tiver checkout, mostra só o Kit Completo
 if (!CHECKOUT.essencial) {
   document.querySelector(".plan.essencial")?.remove();
@@ -429,6 +465,22 @@ document.querySelectorAll(".marquee").forEach(mq => {
 mq.addEventListener("touchstart", () => mq.classList.add("hold"), {passive:true});
 mq.addEventListener("touchend", () => setTimeout(() => mq.classList.remove("hold"), 1500));
 });
+
+// ── eventos de rastreamento
+document.querySelectorAll("[data-checkout]").forEach(a => a.addEventListener("click", e => {
+  const k = a.dataset.checkout, p = PRECO[k];
+  if (!CHECKOUT[k] || !p) return;
+  e.preventDefault();
+  track("InitiateCheckout", {value:p.v, currency:"BRL", content_name:p.n, content_ids:[k], content_type:"product", num_items:1});
+  setTimeout(() => { location.href = a.href; }, 300);
+}));
+document.getElementById("btnEssencial")?.addEventListener("click", () => track("AbriuOfertaEssencial", {content_name:"Pop-up Kit Essencial"}));
+(() => {
+  const sec = document.getElementById("planos"); let done = false;
+  if (!sec || !("IntersectionObserver" in window)) return;
+  new IntersectionObserver((en, ob) => { if (!done && en.some(x => x.isIntersecting)) { done = true; ob.disconnect();
+    track("ViewContent", {value:27.90, currency:"BRL", content_name:"+300 Mapas Mentais de Inglês", content_ids:["completo"], content_type:"product"}); } }, {threshold:0.3}).observe(sec);
+})();
 </script>
 </body>
 </html>
