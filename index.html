@@ -391,11 +391,18 @@ Este site não é afiliado ao Facebook nem a qualquer entidade da Meta. A compra
 <script>
 // ▼ Cole aqui os links de checkout (Hotmart ou Kiwify)
 const CHECKOUT = {
-completo:  "",   // Kit Completo, R$ 27,90
+completo:  "https://mentora.ao/produto/f58de199-9f01-440c-86f7-cf72e3338e71",   // Kit Completo, R$ 27,90
 essencial: "",   // Kit Essencial, R$ 17,90
 downsell:  ""    // Kit Completo com desconto, R$ 22,90
 };
 const qs = location.search.slice(1);
+// Enquanto o Kit Essencial não tiver checkout, mostra só o Kit Completo
+if (!CHECKOUT.essencial) {
+  document.querySelector(".plan.essencial")?.remove();
+  document.querySelector(".plans").style.gridTemplateColumns = "minmax(0,440px)";
+  document.querySelector(".plans").style.justifyContent = "center";
+  const lab = document.querySelector(".plan.pro .lab"); if (lab) lab.textContent = "O QUE ESTÁ INCLUÍDO:";
+}
 const link = k => CHECKOUT[k] ? CHECKOUT[k] + (qs ? (CHECKOUT[k].includes("?") ? "&" : "?") + qs : "") : "#planos";
 document.querySelectorAll("[data-checkout]").forEach(a => a.href = link(a.dataset.checkout));
 // downsell
